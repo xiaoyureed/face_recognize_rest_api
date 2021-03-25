@@ -1,7 +1,16 @@
+# !/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+"""
+Face recognition
+"""
+
 import base64
 import json
 import os
 import os.path as path
+from json.decoder import JSONDecodeError
+import traceback
 
 import cv2
 import face_recognition
@@ -10,8 +19,13 @@ from flask import Flask, request
 
 'do not name this file as flask.py for it conflict with Flask framework'
 
-# WSGI application.
 app = Flask(__name__)
+
+CONST_DATASET_PATH = "./data_set"
+CONST_UPLOAD_TEMP_PATH = "./upload_temp"
+# tolerance
+# will be more strict if make it lower, def to 0.6
+CONST_TOLERANCE = 0.4
 
 
 @app.route('/')
@@ -21,7 +35,7 @@ def hello_world():
 
 def show_dataset():
     result = []
-    file_names = os.listdir("./data_set")
+    file_names = os.listdir(CONST_DATASET_PATH)
     for f_name in file_names:
         (f_name_pure, _) = path.splitext(f_name)
         result.append(f_name_pure)
@@ -55,7 +69,19 @@ def save_pic():
     # str
     req_decoded = request.get_data().decode("utf-8")
     # dict
-    req_parsed = json.loads(req_decoded)
+    # req_parsed = None
+    try:
+        req_parsed = json.loads(req_decoded)
+    except JSONDecodeError as err:
+        err_msg = "Json Format error: " + str(err)
+        print(">>> ", err_msg)
+        print(traceback.format_exc())
+
+        return {
+            "code": 1,
+            "msg": err_msg
+        }
+
     # str
     img_b64 = req_parsed["image"]
     name = req_parsed["name"]
@@ -63,7 +89,8 @@ def save_pic():
 
     # check the  name if already exist or not
     # TODO also have to check encodings to avoid duplicated face in dataset
-    names_exist = os.listdir("upload_temp")
+    # names_exist = os.listdir()
+    names_exist = show_dataset()
     if name in names_exist:
         return {
             "code": 1,
@@ -77,7 +104,8 @@ def save_pic():
 
     # TODO consider remove upload image to save 磁盘,
     #  or 直接从 request stream -> numpy arr -> save locations
-    cv2.imwrite("./upload_temp/{}.{}".format(name, suffix), cv2.imdecode(image_np_arr, cv2.IMREAD_COLOR))
+    cv2.imwrite("{}/{}.{}".format(CONST_UPLOAD_TEMP_PATH, name, suffix),
+                cv2.imdecode(image_np_arr, cv2.IMREAD_COLOR))
 
     # # 格式
     # image_np_arr_rgb = cv2.cvtColor(image_np_arr, cv2.COLOR_BGR2RGB)
@@ -85,7 +113,7 @@ def save_pic():
     # face_locations = face_recognition.face_locations(image_np_arr_rgb)
     # print(face_locations)
 
-    img_brg = cv2.imread("./upload_temp/{}.{}".format(name, suffix))
+    img_brg = cv2.imread("{}/{}.{}".format(CONST_UPLOAD_TEMP_PATH, name, suffix))
     img_rgb = cv2.cvtColor(img_brg, cv2.COLOR_BGR2RGB)
     face_locations = face_recognition.face_locations(img_rgb)
 
@@ -102,7 +130,7 @@ def save_pic():
     # read image from a np arr
     # imdecode = cv2.imdecode(single, cv2.IMREAD_COLOR)
 
-    cv2.imwrite("./data_set/{}.{}".format(name, suffix), single)
+    cv2.imwrite("{}/{}.{}".format(CONST_DATASET_PATH, name, suffix), single)
     print(">>> save {}.{} into dataset".format(name, suffix))
 
     return {
@@ -124,16 +152,20 @@ def get_single_encoding(single_image_path):
 
 def prepare_encoding_dataset(dir_path: str) -> tuple:
     """
-    >remove file name extension: https://www.codegrepper.com/code-examples/python/remove+extension+filename+python
+    Prepare encodings for faces exist in dataset folder
+
     :param dir_path: pics dir path
-    :return: a tuple containing encodings as the first element and names as the second element
+    :return: a tuple containing two element (encodings, names)
     """
     result = ([], [])
+    # The filenames contain suffix, which have to be removed
     file_names = os.listdir(dir_path)
     for f_name in file_names:
+
+        #  skip .DS_Store, only for mac
         if f_name == ".DS_Store":
-            print(">>> skip .DS_Store :) ")
             continue
+
         f_path = path.join(dir_path, f_name)
         if path.isfile(f_path):
             image = face_recognition.load_image_file(f_path)
@@ -141,6 +173,8 @@ def prepare_encoding_dataset(dir_path: str) -> tuple:
             result[0].append(encoding_single)
             (f_name_pure, _) = path.splitext(f_name)
             result[1].append(f_name_pure)
+        else:
+            print(">>> unexpected object, such as dir, link ....")
     return result
 
 
@@ -168,7 +202,17 @@ def face_recognize():
     # str
     req_decoded = request.get_data().decode("utf-8")
     # dict
-    req_parsed = json.loads(req_decoded)
+    try:
+        req_parsed = json.loads(req_decoded)
+    except JSONDecodeError as err:
+        err_msg = "Json Format error: " + str(err)
+        print(">>> ", err_msg)
+        print(traceback.format_exc())
+
+        return {
+            "code": 1,
+            "msg": err_msg
+        }
 
     # str
     img_b64 = req_parsed["image"]
@@ -183,18 +227,18 @@ def face_recognize():
     # 这步 optional
     # img_to_check = np.array(img_rgb)
 
-    result = {}
-
     # error: Unsupported image type, must be 8bit gray or RGB image
     encodings_unknown = face_recognition.face_encodings(img_rgb)
     if not (len(encodings_unknown) > 0):
-        result["code"] = 1
-        result["msg"] = "No face exist in the image that you input"
-        return result
+        return {
+            "code": 1,
+            "msg": "No face exist in the image that you input :("
+        }
 
-    (encodings, names) = prepare_encoding_dataset("data_set")
-    # tolerance, lower is more strict, def to 0.6
-    check_result = face_recognition.compare_faces(encodings, encodings_unknown[0], tolerance=0.5)
+    (encodings, names) = prepare_encoding_dataset(CONST_DATASET_PATH)
+    check_result = face_recognition.compare_faces(
+        encodings, encodings_unknown[0], tolerance=CONST_TOLERANCE
+    )
 
     name_find = ""
     for re_index, re in enumerate(check_result):
@@ -202,16 +246,18 @@ def face_recognize():
             name_find = names[re_index]
 
     if name_find == "":
-        result["code"] = 1
-        result["msg"] = "Cannot recognize the face in your image :("
-        return result
+        return {
+            "code": 1,
+            "msg": "Cannot recognize the face in your image :("
+        }
 
-    result["code"] = 0
-    result["msg"] = ""
-    result["data"] = {
-        "name": name_find
+    return {
+        "code": 0,
+        "msg": "",
+        "data": {
+            "name": name_find
+        }
     }
-    return result
 
 
 if __name__ == '__main__':
