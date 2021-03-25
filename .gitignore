@@ -1,0 +1,8 @@
+.idea
+.DS_Store
+data_set
+upload_temp
+*.iml
+log
+venv
+__pycache__
