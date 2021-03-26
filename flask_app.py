@@ -289,7 +289,7 @@ def face_recognize():
     if count_matched == 0:
         return {
             "code": 1,
-            "msg": "Cannot recognize the face in your image :("
+            "msg": "Cannot recognize the face in your image :(, score -> " + score
         }
 
     # TODO - can be optimized, 合并到上面的循环中去
@@ -300,7 +300,7 @@ def face_recognize():
 
     return {
         "code": 0,
-        "msg": "",
+        "msg": "score -> " + score,
         "data": {
             "name": name_find
         }
