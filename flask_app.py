@@ -24,7 +24,7 @@ app = Flask(__name__)
 CONST_DATASET_PATH = "./data_set"
 CONST_UPLOAD_TEMP_PATH = "./upload_temp"
 # tolerance
-# will be more strict if make it lower, def to 0.6
+# will be more strict if make it lower
 CONST_TOLERANCE = 0.4
 
 
@@ -234,22 +234,40 @@ def face_recognize():
             "code": 1,
             "msg": "No face exist in the image that you input :("
         }
+    if len(encodings_unknown) > 1:
+        return {
+            "code": 1,
+            "msg": "Too many face detected in your image :("
+        }
 
+    # read dataset at one time, 耗费内存
     (encodings, names) = prepare_encoding_dataset(CONST_DATASET_PATH)
     check_result = face_recognition.compare_faces(
         encodings, encodings_unknown[0], tolerance=CONST_TOLERANCE
     )
 
-    name_find = ""
-    for re_index, re in enumerate(check_result):
-        if re:
-            name_find = names[re_index]
+    count_matched = 0
+    for match in check_result:
+        if count_matched > 1:
+            # if return , consider make tolerance lower
+            return {
+                "code": 1,
+                "msg": "Multiple face were matched."
+            }
+        if match:
+            count_matched += 1
 
-    if name_find == "":
+    if count_matched == 0:
         return {
             "code": 1,
             "msg": "Cannot recognize the face in your image :("
         }
+
+    # TODO - can be optimized, 合并到上面的循环中去
+    name_find = ""
+    for re_index, match in enumerate(check_result):
+        if match:
+            name_find = names[re_index]
 
     return {
         "code": 0,
