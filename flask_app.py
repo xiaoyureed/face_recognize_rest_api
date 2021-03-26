@@ -178,6 +178,27 @@ def prepare_encoding_dataset(dir_path: str) -> tuple:
     return result
 
 
+# 计算两张图片的相似度，范围：[0,1]
+def simcos(A, B):
+    A = np.array(A)
+    B = np.array(B)
+    dist = np.linalg.norm(A - B)  # 二范数
+    sim = 1.0 / (1.0 + dist)  #
+    return sim
+
+
+# Threshold越高识别越精准，但是检出率越低
+def compare_faces(x, y, Threshold):
+    ressim = []
+    match = [False] * len(x)
+    for fet in x:
+        sim = simcos(fet, y)
+        ressim.append(sim)
+    if max(ressim) > Threshold:  # 置信度阈值
+        match[ressim.index(max(ressim))] = True
+    return match, max(ressim)
+
+
 @app.route("/face_recognize", methods=["POST"])
 def face_recognize():
     """
@@ -242,9 +263,17 @@ def face_recognize():
 
     # read dataset at one time, 耗费内存
     (encodings, names) = prepare_encoding_dataset(CONST_DATASET_PATH)
-    check_result = face_recognition.compare_faces(
-        encodings, encodings_unknown[0], tolerance=CONST_TOLERANCE
-    )
+    # check_result = face_recognition.compare_faces(
+    #     encodings, encodings_unknown[0], tolerance=CONST_TOLERANCE
+    # )
+
+    (check_result, score) = compare_faces(encodings, encodings_unknown, 0.65)
+    if score <= 0:
+        print(">>> score = ", score)
+        return {
+            "code": 1,
+            "msg": "Score 异常负值"
+        }
 
     count_matched = 0
     for match in check_result:
