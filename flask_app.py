@@ -267,7 +267,7 @@ def face_recognize():
     #     encodings, encodings_unknown[0], tolerance=CONST_TOLERANCE
     # )
 
-    (check_result, score) = compare_faces(encodings, encodings_unknown, 0.65)
+    (check_result, score) = compare_faces(encodings, encodings_unknown, 0.8)
     if score <= 0:
         print(">>> score = ", score)
         return {
