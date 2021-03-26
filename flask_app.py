@@ -115,7 +115,7 @@ def save_pic():
 
     img_brg = cv2.imread("{}/{}.{}".format(CONST_UPLOAD_TEMP_PATH, name, suffix))
     img_rgb = cv2.cvtColor(img_brg, cv2.COLOR_BGR2RGB)
-    face_locations = face_recognition.face_locations(img_rgb, number_of_times_to_upsample=0, model="cnn")
+    face_locations = face_recognition.face_locations(img_rgb)
 
     if len(face_locations) > 1:
         return {
@@ -267,7 +267,7 @@ def face_recognize():
     #     encodings, encodings_unknown[0], tolerance=CONST_TOLERANCE
     # )
 
-    (check_result, score) = compare_faces(encodings, encodings_unknown, 0.8)
+    (check_result, score) = compare_faces(encodings, encodings_unknown, 0.7)
     if score <= 0:
         print(">>> score = ", score)
         return {
