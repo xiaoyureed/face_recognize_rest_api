@@ -115,7 +115,7 @@ def save_pic():
 
     img_brg = cv2.imread("{}/{}.{}".format(CONST_UPLOAD_TEMP_PATH, name, suffix))
     img_rgb = cv2.cvtColor(img_brg, cv2.COLOR_BGR2RGB)
-    face_locations = face_recognition.face_locations(img_rgb)
+    face_locations = face_recognition.face_locations(img_rgb, number_of_times_to_upsample=0, model="cnn")
 
     if len(face_locations) > 1:
         return {
