@@ -1,6 +1,6 @@
 # face_recognize_app
 
-Thanks [face_recognition](https://github.com/ageitgey/face_recognitio)
+Thanks [face_recognition](https://github.com/ageitgey/face_recognition)
 
 api 文档 -> doc/api_doc.md
 
