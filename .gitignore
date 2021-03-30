@@ -6,3 +6,5 @@ upload_temp
 log
 venv
 __pycache__
+
+*.db
