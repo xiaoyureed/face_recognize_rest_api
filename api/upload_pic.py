@@ -6,7 +6,7 @@ from json.decoder import JSONDecodeError
 import cv2
 import face_recognition
 import numpy as np
-from flask import Blueprint
+from flask import Blueprint, current_app
 from flask import request, g
 
 from database.exts import db
@@ -86,7 +86,7 @@ def execute():
     # print(">>> save {}.{} into dataset".format(name, suffix))
 
     consumer_id = g.get("consumer_id")
-    print(">>> ", consumer_id)
+    current_app.logger.debug('>>> consumer_id = {}'.format(consumer_id))
     encoding = face_recognition.face_encodings(img_rgb)[0]
     face = Face(name=name, id_card=id_card, arr=str_utils.enc_face_encoding(encoding),
                 consumer_id=consumer_id)

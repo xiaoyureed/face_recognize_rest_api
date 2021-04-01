@@ -6,7 +6,7 @@ salt = "salt_2021@#"
 log_level = logging.DEBUG
 
 # enable api key check
-api_key_check = False
+api_key_check = True
 api_key_white_list = ['/consumers']
 
 # enable sign check

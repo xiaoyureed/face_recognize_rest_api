@@ -8,9 +8,9 @@ from json.decoder import JSONDecodeError
 import cv2
 import face_recognition
 import numpy as np
-from flask import request, Blueprint
+from flask import request, Blueprint, g
 
-import config
+import app_props
 from database.models import Face
 from model.resp import BaseResp, RecognizeResp
 from util import str_utils, obj_utils
@@ -113,14 +113,20 @@ def execute():
     if len(encodings_unknown) > 1:
         return BaseResp(code=1, msg="Too many face detected in your image :(")
 
-    faces = Face.query.all()
+    #
+    consumer_id = g.get('consumer_id')
+
+    faces = Face.query.filter_by(consumer_id=consumer_id).all()
+    if len(faces) == 0:
+        return BaseResp.err('Upload first')
+
     encodings = []
     names = []
     for face in faces:
         encodings.append(str_utils.dec_face_encoding(face.arr))
         names.append(face.name)
 
-    (check_result, score) = compare_faces(encodings, encodings_unknown, config.threshold_score)
+    (check_result, score) = compare_faces(encodings, encodings_unknown, app_props.threshold_score)
     if score <= 0:
         print(">>> score = ", score)
         return BaseResp(code=1, msg="Score 异常负值")

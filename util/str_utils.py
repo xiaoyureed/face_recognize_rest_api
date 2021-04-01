@@ -13,8 +13,15 @@ def md5(target: str) -> str:
     return md5_hash_obj.hexdigest()
 
 
-def gen_uuid(namespace: str) -> str:
-    id_uuid = uuid.uuid3(uuid.NAMESPACE_DNS, namespace)
+def md5_with_salt(target: str, salt: str) -> str:
+    md5_hash_obj = hashlib.md5(salt.encode('utf-8'))
+    md5_hash_obj.update(target.encode("utf-8"))
+    # length 32
+    return md5_hash_obj.hexdigest()
+
+
+def gen_uuid(name: str) -> str:
+    id_uuid = uuid.uuid3(uuid.NAMESPACE_DNS, name)
     return str(id_uuid)
 
 

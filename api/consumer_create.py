@@ -1,3 +1,5 @@
+import time
+
 from flask import Blueprint, current_app
 from flask import request
 from pydantic import BaseModel
@@ -43,13 +45,15 @@ def execute():
     if find:
         return BaseResp.err('name already exist')
 
-    consumer = Consumer(name=name, pwd=str_utils.md5(pwd))
+    consumer = Consumer(name=name, pwd=str_utils.md5_with_salt(pwd, name))
     db.session.add(consumer)
     db.session.flush()
     current_app.logger.debug(">>> insert consumer, id = {}".format(consumer.id))
 
-    api_key = str_utils.gen_uuid(name)
-    secret_key = str_utils.gen_uuid(pwd)
+    # Format: 20170709_184921
+    data_time = time.strftime('%Y%m%d_%H%M%S', time.localtime(time.time()))
+    api_key = str_utils.gen_uuid(name + data_time)
+    secret_key = str_utils.gen_uuid(pwd + data_time)
     key = Key(consumer_id=consumer.id, api_key=api_key, secret_key=secret_key)
     db.session.add(key)
     db.session.flush()
