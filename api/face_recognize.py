@@ -8,10 +8,23 @@ from json.decoder import JSONDecodeError
 import cv2
 import face_recognition
 import numpy as np
-from flask import request
+from flask import request, Blueprint
 
-from config import consts
+import config
+from database.models import Face
 from model.resp import BaseResp, RecognizeResp
+from util import str_utils, obj_utils
+
+
+def get_single_encoding(single_image_path):
+    """
+    resolve single image encoding
+
+    :param single_image_path: image relative path
+    :return: image encoding
+    """
+    image_single = face_recognition.load_image_file(single_image_path)
+    return face_recognition.face_encodings(image_single)[0]
 
 
 def prepare_encoding_dataset(dir_path: str) -> tuple:
@@ -100,13 +113,14 @@ def execute():
     if len(encodings_unknown) > 1:
         return BaseResp(code=1, msg="Too many face detected in your image :(")
 
-    # read dataset at one time, 耗费内存
-    (encodings, names) = prepare_encoding_dataset(consts.dataset_path)
-    # check_result = face_recognition.compare_faces(
-    #     encodings, encodings_unknown[0], tolerance=CONST_TOLERANCE
-    # )
+    faces = Face.query.all()
+    encodings = []
+    names = []
+    for face in faces:
+        encodings.append(str_utils.dec_face_encoding(face.arr))
+        names.append(face.name)
 
-    (check_result, score) = compare_faces(encodings, encodings_unknown, consts.threshold_score)
+    (check_result, score) = compare_faces(encodings, encodings_unknown, config.threshold_score)
     if score <= 0:
         print(">>> score = ", score)
         return BaseResp(code=1, msg="Score 异常负值")
@@ -129,3 +143,29 @@ def execute():
             name_find = names[re_index]
 
     return BaseResp[RecognizeResp](code=0, msg="score -> " + str(score), data=RecognizeResp(name=name_find))
+
+
+face_recognize_bp = Blueprint('face_recognize_bp', __name__)
+
+
+@face_recognize_bp.route("/face_recognize", methods=["POST"])
+def face_recognize():
+    """
+    识别
+
+    req:
+    {
+        "image": "base64"
+    }
+
+    resp:
+    {
+        "code": 0,
+        "msg": "",
+        data: {
+            "name": "xxx"
+        }
+    }
+    """
+    re = execute()
+    return obj_utils.resp_json(re)

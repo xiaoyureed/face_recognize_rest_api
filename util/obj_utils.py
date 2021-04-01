@@ -1,4 +1,6 @@
-def obj_to_dict(obj: object):
-    re = {}
-    re.update(obj.__dict__())
-    return re
+from flask import jsonify
+from pydantic import BaseModel
+
+
+def resp_json(obj: BaseModel):
+    return jsonify(obj.dict(exclude_none=True))

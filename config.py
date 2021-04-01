@@ -1,13 +1,21 @@
+import logging
+
 # salt for md5 enc
 salt = "salt_2021@#"
+
+log_level = logging.DEBUG
+
+# enable api key check
+api_key_check = False
+api_key_white_list = ['/consumers']
+
+# enable sign check
+sign_check = False
 
 # if higher, then stricter
 threshold_score = 0.738
 # lower, stricter
 # threshold_tolerance = 0.4
-
-dataset_path = "./data_set"
-upload_temp_path = "./upload_temp"
 
 ######
 # db

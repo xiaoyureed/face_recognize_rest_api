@@ -45,4 +45,3 @@ class ConsumerFindResp(BaseModel):
     id: int
     name: str
     pwd: str
-

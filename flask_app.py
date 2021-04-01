@@ -4,97 +4,117 @@
 """
 Face recognition
 """
+import logging
 
-import face_recognition
-from flask import Flask, request, jsonify
-from config import consts
-from database.models import Consumer
-from model.resp import BaseResp, ConsumerFindResp
+from flask import Flask, jsonify, request, g
+
+import config
+from api.consumer_create import consumer_create_bp
+from api.dataset import dataset_bp
+from api.face_recognize import face_recognize_bp
+from api.upload_pic import upload_pic_bp
 from database.exts import db
-from service import dataset, upload_pic, face_recog
+from database.models import Consumer, Key
+from model.resp import BaseResp, ConsumerFindResp
+from util import str_utils
+from util.obj_utils import resp_json
 
 'do not name this file as flask.py for it conflict with Flask framework'
 
 app = Flask(__name__)
-app.config.from_object(consts)
+app.config.from_object(config)
 db.init_app(app)
 
+# log
+#
+# logging.basicConfig(**{
+#     'level': logging.DEBUG
+# })
+app.logger.setLevel(config.log_level)
 
-@app.route('/consumers', methods=['POST'])
-def create_consumer():
-    json_req = request.json
-    name = json_req.get("name", "def_value").strip()
-    pwd = json_req.get("pwd", "").strip()
+app.register_blueprint(upload_pic_bp)
+app.register_blueprint(face_recognize_bp)
+app.register_blueprint(dataset_bp)
+app.register_blueprint(consumer_create_bp)
 
-    db.session.add(Consumer(name=name, pwd=pwd))
-    db.session.commit()
-
-    return jsonify(BaseResp.ok().dict())
-
-
-@app.route('/consumers', methods=['GET'])
-def find_consumer():
-    consumers = Consumer.query.all()
-    data = [ConsumerFindResp(id=c.id, name=c.name, pwd=c.pwd).dict() for c in consumers]
-    print(data)
-    return jsonify(BaseResp.ok_with_data(data).dict())
+log = app.logger
 
 
-@app.route("/dataset", methods=['GET'])
-def supported_dataset():
-    re = dataset.execute()
-    return jsonify(re.dict())
+@app.errorhandler(500)
+def handling_unknown_err(e):
+    """Global exception Handler"""
+    log.exception(e)
+    return resp_json(BaseResp.err(e.name))
 
 
-@app.route("/upload_pic", methods=['POST'])
-def save_pic():
+@app.before_request
+def api_key_check():
+    """Global interceptor
     """
-    仅仅允许独照, 合照无法确认每个人的名字
+    req_path = request.path
+    method_type = request.method
+    log.info(">>> path = {}, method = {}".format(req_path, method_type))
 
-    req:
-    {
-        "image": "base64_str",
-        "name": "Tom",
-        "suffix": "jpg"
-    }
+    if not config.api_key_check:
+        log.debug('>>> api key check closed')
+        return None
+
+    if req_path in config.api_key_white_list:
+        log.info('>>> {} in white list, pass'.format(req_path))
+        return None
+    headers = request.headers
+    api_key_from_req = headers.get('x-api-key')
+    if not api_key_from_req:
+        log.debug('>>> enter api-key error')
+        return resp_json(BaseResp.err('no x-api-key header'))
+
+    key_obj = Key.query.filter_by(api_key=api_key_from_req).first()
+    if key_obj:
+        log.debug('>>> consumer_id = {}, secret_key = {}'.format(key_obj.consumer_id, key_obj.secret_key))
+        g.consumer_id = key_obj.consumer_id
+        g.secret_key = key_obj.secret_key
+        return None
+    else:
+        return resp_json(BaseResp.err('Err api key'))
+
+
+def request_parse(req_data):
+    """解析请求数据并以json形式返回"""
+    data = None
+    if req_data.method == 'POST':
+        data = req_data.json
+    elif req_data.method == 'GET':
+        data = req_data.args
+    return data
+
+
+def sort_dict(dic):
+    """sorted according to key
     """
-    re = upload_pic.execute()
-    return jsonify(re.dict(exclude_none=True))
+    return sorted(dic.items(), key=lambda d: d[0])
 
 
-def get_single_encoding(single_image_path):
-    """
-    resolve single image encoding
-
-    :param single_image_path: image relative path
-    :return: image encoding
-    """
-    image_single = face_recognition.load_image_file(single_image_path)
-    return face_recognition.face_encodings(image_single)[0]
-
-
-@app.route("/face_recognize", methods=["POST"])
-def face_recognize():
-    """
-    识别
-
-    req:
-    {
-        "image": "base64"
-    }
-
-    resp:
-    {
-        "code": 0,
-        "msg": "",
-        data: {
-            "name": "xxx"
-        }
-    }
-    """
-    re = face_recog.execute()
-    return jsonify(re.dict(exclude_none=True))
+@app.before_request
+def sign_check():  # order decided by code order
+    if not config.sign_check:
+        log.debug('>>> sign check closed')
+        return None
+    # dict
+    data = request_parse(request)
+    # [(k,v),...]
+    data_sorted = sort_dict(data)
+    data_to_be_enc = []
+    for entry in data_sorted:
+        data_to_be_enc.append(entry[0] + entry[1])
+    secret_key = g.get("secret_key")
+    data_to_be_enc = secret_key.join(data_to_be_enc)
+    data_enc = str_utils.md5(data_to_be_enc)
+    sign_from_req = request.headers.get('x-sign')
+    if not sign_from_req:
+        return resp_json(BaseResp.err('no x-sign header'))
+    if sign_from_req != data_enc:
+        return resp_json(BaseResp.err('Sign error'))
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
