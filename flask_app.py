@@ -21,6 +21,7 @@ from util.obj_utils import resp_json
 'do not name this file as flask.py for it conflict with Flask framework'
 
 app = Flask(__name__)
+# db migration
 app.config.from_object(app_props)
 db.init_app(app)
 
@@ -31,6 +32,7 @@ db.init_app(app)
 # })
 app.logger.setLevel(app_props.log_level)
 
+# blueprint
 app.register_blueprint(upload_pic_bp)
 app.register_blueprint(face_recognize_bp)
 app.register_blueprint(dataset_bp)
@@ -39,14 +41,14 @@ app.register_blueprint(consumer_create_bp)
 
 @app.errorhandler(500)
 def handling_unknown_err(e):
-    """Global exception Handler"""
+    """Global unknown exception Handler"""
     app.logger.exception(e)
     return resp_json(BaseResp.err(e.name))
 
 
 @app.before_request
 def api_key_check():
-    """Global interceptor
+    """Api key verificcation interceptor
     """
     req_path = request.path
     method_type = request.method
@@ -76,7 +78,12 @@ def api_key_check():
 
 
 def request_parse(req_data):
-    """解析请求数据并以json形式返回"""
+    """
+    parse request
+
+    :param req_data: flask request
+    :return: a dict
+    """
     data = None
     if req_data.method == 'POST':
         data = req_data.json
@@ -86,7 +93,7 @@ def request_parse(req_data):
 
 
 def sort_dict(dic):
-    """sorted according to key
+    """sort dictionary according to key, default -> asc
     """
     return sorted(dic.items(), key=lambda d: d[0])
 
@@ -94,6 +101,8 @@ def sort_dict(dic):
 @app.before_request
 def sign_check():  # order decided by code order
     """
+    sign check
+
     sign gen format: md5(secret_key + k1v1k2v2.. + secret_key)
     """
     if not app_props.sign_check:
@@ -101,8 +110,9 @@ def sign_check():  # order decided by code order
         return None
     # dict
     data = request_parse(request)
-    # [(k,v),...]
+    # is a list -> [(k,v),...]
     data_sorted = sort_dict(data)
+
     data_to_be_enc = []
     for entry in data_sorted:
         data_to_be_enc.append(entry[0] + entry[1])
