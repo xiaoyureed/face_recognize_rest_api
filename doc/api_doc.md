@@ -10,7 +10,7 @@
 
 ```
 x-api-key
-x-sign  生成规则: 请求参数按照名称升序排列, 然后 md5(secret_key + k1v1k2v2.. + secret_key)
+x-sign  生成规则: 请求参数按照参数名升序排序然后拼接,  md5(secret_key + k1v1k2v2.. + secret_key)
 ```
 
 ## apply api_key secret_key
@@ -84,7 +84,8 @@ req:
 {
   "code": 0,
   "data": {
-    "name": "刘诗诗"
+    "name": "",
+    "idCard": ""
   },
   "msg": ""
 }

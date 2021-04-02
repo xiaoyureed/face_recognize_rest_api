@@ -8,7 +8,7 @@ from json.decoder import JSONDecodeError
 import cv2
 import face_recognition
 import numpy as np
-from flask import request, Blueprint, g
+from flask import request, Blueprint, g, current_app
 
 import app_props
 from database.models import Face
@@ -66,6 +66,13 @@ def simcos(A, B):
 
 # Threshold越高识别越精准，但是检出率越低
 def compare_faces(x, y, Threshold):
+    """
+
+    :param x: encodings
+    :param y: unknown encoding
+    :param Threshold: 阈值
+    :return: (match_list, max_score)
+    """
     ressim = []
     match = [False] * len(x)
     for fet in x:
@@ -116,39 +123,60 @@ def execute():
     #
     consumer_id = g.get('consumer_id')
 
-    faces = Face.query.filter_by(consumer_id=consumer_id).all()
-    if len(faces) == 0:
-        return BaseResp.err('Upload first')
+    # ###### 分多个批次读取人脸数据
+    #
+    # read count at one time
+    batch_count = 1000
+    # start offset
+    page = 1
+    name_find = None
+    id_card = None
+    # 匹配到的人脸数
+    match_count = 0
+    # 匹配成功/失败的分数
+    score = 0
+    while True:
 
-    encodings = []
-    names = []
-    for face in faces:
-        encodings.append(str_utils.dec_face_encoding(face.arr))
-        names.append(face.name)
+        if match_count > 1:
+            return BaseResp.err('Multiple faces were recognized as the same person :(')
 
-    (check_result, score) = compare_faces(encodings, encodings_unknown, app_props.threshold_score)
-    if score <= 0:
-        print(">>> score = ", score)
-        return BaseResp(code=1, msg="Score 异常负值")
+        # read with pagination
+        paginate = Face.query.filter_by(consumer_id=consumer_id).paginate(page=page, per_page=batch_count)
+        items = paginate.items
+        if len(items) == 0:
+            return BaseResp.err('Upload face firstly')
 
-    count_matched = 0
-    for match in check_result:
-        if count_matched > 1:
-            # if return , consider make tolerance lower
-            return BaseResp(code=1, msg="Multiple faces were recognized as the same person :(")
-        if match:
-            count_matched += 1
+        # face encodings in one batch
+        encodings = []
+        # name mappings
+        names = []
+        # id card mappings
+        id_cards = []
+        for face in items:
+            encodings.append(str_utils.dec_face_encoding(face.arr))
+            names.append(face.name)
+            id_cards.append(face.id_card)
 
-    if count_matched == 0:
-        return BaseResp(code=1, msg="Cannot recognize the face in your image :(, score -> " + str(score))
+        (check_result, score_batch_max) = compare_faces(encodings, encodings_unknown, app_props.threshold_score)
+        if score < score_batch_max:
+            score = score_batch_max
 
-    # TODO - can be optimized, 合并到上面的循环中去
-    name_find = ""
-    for re_index, match in enumerate(check_result):
-        if match:
-            name_find = names[re_index]
+        for result_index, match in enumerate(check_result):
+            if match:
+                name_find = names[result_index]
+                id_card = id_cards[result_index]
+                current_app.logger.debug('>>> find face, name = {}, id_card = {}'.format(name_find, id_card))
+                match_count += 1
 
-    return BaseResp[RecognizeResp](code=0, msg="score -> " + str(score), data=RecognizeResp(name=name_find))
+        if paginate.has_next:
+            page += 1
+        else:
+            break
+
+    if match_count == 0:
+        return BaseResp.err("Cannot recognize the face in your image :( score -> " + str(score))
+
+    return BaseResp.ok_with_data(RecognizeResp(name=name_find, idCard=id_card))
 
 
 face_recognize_bp = Blueprint('face_recognize_bp', __name__)

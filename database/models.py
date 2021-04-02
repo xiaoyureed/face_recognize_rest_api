@@ -13,6 +13,7 @@ class Key(db.Model):
     consumer_id = db.Column(db.Integer)
     api_key = db.Column(db.String(50))
     secret_key = db.Column(db.String(50))
+    name = db.Column(db.String(50))
 
 
 class Face(db.Model):

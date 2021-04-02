@@ -39,6 +39,7 @@ class DatasetResp(BaseModel):
 
 class RecognizeResp(BaseModel):
     name: str
+    idCard: str
 
 
 class ConsumerFindResp(BaseModel):

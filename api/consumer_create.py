@@ -54,7 +54,7 @@ def execute():
     data_time = time.strftime('%Y%m%d_%H%M%S', time.localtime(time.time()))
     api_key = str_utils.gen_uuid(name + data_time)
     secret_key = str_utils.gen_uuid(pwd + data_time)
-    key = Key(consumer_id=consumer.id, api_key=api_key, secret_key=secret_key)
+    key = Key(consumer_id=consumer.id, api_key=api_key, secret_key=secret_key, name='default')
     db.session.add(key)
     db.session.flush()
     current_app.logger.debug(">>> insert key, id = {}".format(key.id))
