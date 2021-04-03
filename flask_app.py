@@ -4,6 +4,8 @@
 """
 Face recognition
 """
+import logging
+from logging.handlers import TimedRotatingFileHandler
 
 from flask import Flask, request, g
 
@@ -126,5 +128,19 @@ def sign_check():  # order decided by code order
         return resp_json(BaseResp.err('Sign error'))
 
 
+@app.route('/')
+def hello():
+    app.logger.debug('debug')
+    app.logger.info('info')
+    app.logger.error('error')
+
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    formatter = logging.Formatter(
+        "[%(asctime)s][%(filename)s:%(lineno)d][%(levelname)s][%(thread)d] - %(message)s")
+    handler = TimedRotatingFileHandler(
+        "log/flask.log", when="D", interval=1, backupCount=15,
+        encoding="UTF-8", delay=False, utc=True)
+    handler.setFormatter(formatter)
+    app.logger.addHandler(handler)
+    app.run(host='0.0.0.0', port=5001, debug=True)
